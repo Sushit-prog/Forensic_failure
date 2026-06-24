@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Eval Runs — AI Reliability Platform{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2>Evaluation Runs</h2>
+    <p>History of all evaluation executions</p>
+</div>
+
+{% if runs %}
+<table>
+    <thead>
+        <tr><th>Run</th><th>Provider</th><th>Model</th><th>Status</th><th>Pass Rate</th><th>Avg Latency</th><th>Cost</th><th>Created</th></tr>
+    </thead>
+    <tbody>
+    {% for r in runs %}
+        <tr>
+            <td><a href="/eval/runs/{{ r.id }}">#{{ r.id }}</a></td>
+            <td>{{ r.provider }}</td>
+            <td>{{ r.model }}</td>
+            <td><span class="badge {{ r.status }}">{{ r.status }}</span></td>
+            <td>{{ "%.1f"|format(r.passed_cases / r.total_cases * 100) if r.total_cases > 0 else "N/A" }}%</td>
+            <td>{{ "%.0f"|format(r.avg_latency_ms) }}ms</td>
+            <td>${{ "%.4f"|format(r.estimated_cost) }}</td>
+            <td>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty">No eval runs yet. Start one via the API:
+    <pre style="margin-top: 12px; background: #21262d; padding: 12px; border-radius: 6px; display: inline-block; text-align: left; color: #c9d1d9;">curl -X POST http://localhost:8000/api/v1/eval/runs \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_id": 1, "provider": "groq", "model": "llama-3.3-70b-versatile"}'</pre>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — AI Reliability Platform{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2>Dashboard</h2>
+    <p>Overview of your LLM evaluation and tracing activity</p>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <div class="label">Eval Runs</div>
+        <div class="value blue">{{ total_runs }}</div>
+    </div>
+    <div class="card">
+        <div class="label">Traces</div>
+        <div class="value blue">{{ total_traces }}</div>
+    </div>
+    <div class="card">
+        <div class="label">Total Results</div>
+        <div class="value">{{ total_results }}</div>
+    </div>
+    <div class="card">
+        <div class="label">Pass Rate</div>
+        <div class="value green">{{ pass_rate }}</div>
+    </div>
+</div>
+
+{% if recent_runs %}
+<h3 style="margin-bottom: 12px; font-size: 16px;">Recent Eval Runs</h3>
+<table>
+    <thead>
+        <tr><th>Run</th><th>Provider</th><th>Model</th><th>Status</th><th>Pass Rate</th><th>Latency</th><th>Cost</th></tr>
+    </thead>
+    <tbody>
+    {% for run in recent_runs %}
+        <tr>
+            <td><a href="/eval/runs/{{ run.id }}">#{{ run.id }}</a></td>
+            <td>{{ run.provider }}</td>
+            <td>{{ run.model }}</td>
+            <td><span class="badge {{ run.status }}">{{ run.status }}</span></td>
+            <td>{{ "%.1f"|format(run.passed_cases / run.total_cases * 100) if run.total_cases > 0 else "N/A" }}%</td>
+            <td>{{ "%.0f"|format(run.avg_latency_ms) }}ms</td>
+            <td>${{ "%.4f"|format(run.estimated_cost) }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty">No eval runs yet. <a href="/eval/datasets">Create a dataset</a> to get started.</div>
+{% endif %}
+
+{% if recent_traces %}
+<h3 style="margin: 30px 0 12px; font-size: 16px;">Recent Traces</h3>
+<table>
+    <thead>
+        <tr><th>Trace ID</th><th>Name</th><th>Status</th><th>Latency</th><th>Tokens</th><th>Time</th></tr>
+    </thead>
+    <tbody>
+    {% for trace in recent_traces %}
+        <tr>
+            <td><a href="/traces/{{ trace.trace_id }}">{{ trace.trace_id[:8] }}...</a></td>
+            <td>{{ trace.name or "—" }}</td>
+            <td><span class="badge {{ trace.status }}">{{ trace.status }}</span></td>
+            <td>{{ "%.0f"|format(trace.total_latency_ms) }}ms</td>
+            <td>{{ trace.total_tokens }}</td>
+            <td>{{ trace.created_at.strftime("%H:%M:%S") }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

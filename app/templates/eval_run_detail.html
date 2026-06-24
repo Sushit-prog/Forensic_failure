@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Run #{{ run.id }} — AI Reliability Platform{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2>Eval Run #{{ run.id }}</h2>
+    <p>{{ run.provider }} / {{ run.model }} · <span class="badge {{ run.status }}">{{ run.status }}</span></p>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <div class="label">Pass Rate</div>
+        <div class="value green">{{ "%.1f"|format(run.passed_cases / run.total_cases * 100) if run.total_cases > 0 else "N/A" }}%</div>
+    </div>
+    <div class="card">
+        <div class="label">Passed / Total</div>
+        <div class="value">{{ run.passed_cases }} / {{ run.total_cases }}</div>
+    </div>
+    <div class="card">
+        <div class="label">Avg Latency</div>
+        <div class="value">{{ "%.0f"|format(run.avg_latency_ms) }}ms</div>
+    </div>
+    <div class="card">
+        <div class="label">Est. Cost</div>
+        <div class="value">${{ "%.4f"|format(run.estimated_cost) }}</div>
+    </div>
+</div>
+
+<h3 style="margin-bottom: 12px; font-size: 16px;">Results</h3>
+<table>
+    <thead>
+        <tr><th>#</th><th>Status</th><th>Score</th><th>Input</th><th>Expected</th><th>Actual</th><th>Latency</th></tr>
+    </thead>
+    <tbody>
+    {% for r in results %}
+        {% set case = cases.get(r.test_case_id) %}
+        <tr>
+            <td>{{ r.test_case_id }}</td>
+            <td><span class="badge {{ r.status }}">{{ r.status }}</span></td>
+            <td>{{ "%.2f"|format(r.score) if r.score is not none else "—" }}</td>
+            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">{{ case.input_text[:60] if case else "—" }}</td>
+            <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">{{ case.expected_output[:50] if case else "—" }}</td>
+            <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">{{ r.actual_output[:50] if r.actual_output else r.error_message[:50] if r.error_message else "—" }}</td>
+            <td>{{ "%.0f"|format(r.latency_ms) if r.latency_ms else "—" }}ms</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

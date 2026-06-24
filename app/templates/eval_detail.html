@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ dataset.name }} — AI Reliability Platform{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2>{{ dataset.name }}</h2>
+    <p>{{ dataset.description or "No description" }} · {{ cases|length }} test cases</p>
+</div>
+
+{% if cases %}
+<table>
+    <thead>
+        <tr><th>ID</th><th>Input</th><th>Expected Output</th><th>Category</th><th>Difficulty</th></tr>
+    </thead>
+    <tbody>
+    {% for c in cases %}
+        <tr>
+            <td>{{ c.id }}</td>
+            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">{{ c.input_text[:100] }}</td>
+            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">{{ c.expected_output[:80] }}</td>
+            <td>{{ c.category or "—" }}</td>
+            <td><span class="badge {{ c.difficulty }}">{{ c.difficulty }}</span></td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty">No test cases in this dataset.</div>
+{% endif %}
+{% endblock %}
