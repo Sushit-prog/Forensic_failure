@@ -1,6 +1,10 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 
 
 class Trace(SQLModel, table=True):
@@ -14,7 +18,7 @@ class Trace(SQLModel, table=True):
     total_tokens: int = 0
     estimated_cost: float = 0.0
     metadata_json: Optional[str] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
     spans: list["Span"] = Relationship(back_populates="trace")
 
@@ -37,7 +41,7 @@ class Span(SQLModel, table=True):
     tokens_out: Optional[int] = None
     error_message: Optional[str] = None
     metadata_json: Optional[str] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
     trace: Optional[Trace] = Relationship(back_populates="spans")
 

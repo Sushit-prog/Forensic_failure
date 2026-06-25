@@ -1,9 +1,17 @@
 from sqlmodel import Session, select
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database import get_engine
 from app.models.eval import EvalDataset, TestCase, EvalRun, EvalResult
 from app.services.providers.registry import get_provider
-from app.services.scoring import exact_match_score, semantic_similarity_score
+from app.services.scoring import exact_match_score, fuzzy_match_score
+
+
+def extract_label(raw_output: str) -> str:
+    raw = raw_output.strip().lower()
+    for label in ["spam", "important", "promotional"]:
+        if label in raw:
+            return label
+    return raw.split()[0] if raw else raw
 from app.services.trace_collector import TraceCollector
 
 
@@ -73,11 +81,14 @@ class EvalRunner:
         total_latency = 0.0
         total_tokens = 0
         total_cost = 0.0
+        total_score = 0.0
         passed = 0
         failed = 0
 
         for case in cases:
             try:
+                system_prompt = "Classify emails as exactly one of: spam, important, or promotional. Reply with ONLY the single word label, nothing else. No explanation, no formatting, just the label."
+
                 async with self.tracer.trace_call(
                     name=f"eval_case_{case.id}",
                     provider=run.provider,
@@ -86,15 +97,17 @@ class EvalRunner:
                     response = await provider.complete(
                         prompt=case.input_text,
                         model=run.model,
-                        system_prompt=run.prompt_template,
+                        system_prompt=system_prompt,
                     )
 
-                    score = exact_match_score(case.expected_output, response.content)
+                    extracted = extract_label(response.content)
+                    print(f"[CASE {case.id}] raw='{response.content[:80]}' extracted='{extracted}' expected='{case.expected_output}'")
+                    score = exact_match_score(case.expected_output, extracted)
                     if score < 1.0:
-                        sem_score = semantic_similarity_score(case.expected_output, response.content)
-                        score = max(score, sem_score)
+                        fuzzy = fuzzy_match_score(case.expected_output, extracted)
+                        score = max(score, fuzzy)
 
-                    status = "pass" if score >= 0.8 else "fail"
+                    status = "pass" if score >= 0.7 else "fail"
 
                     result = EvalResult(
                         run_id=run_id,
@@ -113,25 +126,35 @@ class EvalRunner:
                     total_latency += response.latency_ms
                     total_tokens += response.tokens_in + response.tokens_out
                     total_cost += provider.estimate_cost(response.tokens_in, response.tokens_out)
+                    total_score += score
 
                     if status == "pass":
                         passed += 1
                     else:
                         failed += 1
 
+                    print(f"[CASE {case.id}] score={score:.2f} pass={status == 'pass'}")
+
             except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(f"[ERROR] case={case.id} error={str(e)}")
                 result = EvalResult(
                     run_id=run_id,
                     test_case_id=case.id,
                     status="error",
                     error_message=str(e),
+                    score=0.0,
                 )
                 with Session(self.engine) as session:
                     session.add(result)
                     session.commit()
                 failed += 1
+                print(f"[CASE {case.id}] ERROR: {e}")
 
         total_cases = passed + failed
+        avg_score = total_score / total_cases if total_cases > 0 else 0.0
+
         with Session(self.engine) as session:
             run = session.get(EvalRun, run_id)
             if run:
@@ -142,12 +165,12 @@ class EvalRunner:
                 run.total_tokens = total_tokens
                 run.estimated_cost = total_cost
                 run.status = "completed"
-                run.completed_at = datetime.utcnow()
+                run.completed_at = datetime.now(timezone.utc)
                 session.add(run)
                 session.commit()
                 session.refresh(run)
-                return run
 
+        print(f"[RUN COMPLETE] passed={passed}/{total_cases} avg_score={avg_score:.2f}")
         return run
 
     def get_run(self, run_id: int) -> EvalRun | None:

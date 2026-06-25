@@ -9,7 +9,7 @@ from app.database import init_db, get_engine
 from app.services.eval_runner import EvalRunner
 from sqlmodel import Session
 from app.models.trace import Trace, Span
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 import random
 
@@ -93,7 +93,7 @@ def seed():
                 status=status,
                 total_latency_ms=latency,
                 total_tokens=tokens,
-                created_at=datetime.utcnow() - timedelta(hours=random.randint(0, 72)),
+                created_at=datetime.now(timezone.utc) - timedelta(hours=random.randint(0, 72)),
             )
             session.add(trace)
 

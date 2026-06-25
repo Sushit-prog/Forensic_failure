@@ -1,7 +1,11 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import json
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 
 
 class EvalDataset(SQLModel, table=True):
@@ -10,8 +14,8 @@ class EvalDataset(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     description: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
     test_cases: list["TestCase"] = Relationship(back_populates="dataset")
     eval_runs: list["EvalRun"] = Relationship(back_populates="dataset")
@@ -27,7 +31,7 @@ class TestCase(SQLModel, table=True):
     category: Optional[str] = None
     difficulty: str = "medium"
     metadata_json: Optional[str] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
     dataset: Optional[EvalDataset] = Relationship(back_populates="test_cases")
 
@@ -53,7 +57,7 @@ class EvalRun(SQLModel, table=True):
     avg_latency_ms: float = 0.0
     total_tokens: int = 0
     estimated_cost: float = 0.0
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     completed_at: Optional[datetime] = None
 
     dataset: Optional[EvalDataset] = Relationship(back_populates="eval_runs")
@@ -73,6 +77,6 @@ class EvalResult(SQLModel, table=True):
     tokens_in: Optional[int] = None
     tokens_out: Optional[int] = None
     error_message: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
     run: Optional[EvalRun] = Relationship(back_populates="results")

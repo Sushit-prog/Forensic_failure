@@ -40,8 +40,7 @@ def dashboard(request: Request):
 
     pass_rate = f"{(passed / total_results * 100):.1f}%" if total_results > 0 else "N/A"
 
-    return templates.TemplateResponse("dashboard.html", context={
-        "request": request,
+    return templates.TemplateResponse(request, "dashboard.html", {
         "total_runs": len(total_runs),
         "total_traces": len(total_traces),
         "total_results": total_results,
@@ -56,7 +55,7 @@ def dashboard(request: Request):
 def eval_datasets_page(request: Request):
     with Session(get_engine()) as session:
         datasets = list(session.exec(select(EvalDataset)).all())
-    return templates.TemplateResponse("eval_datasets.html", context={"request": request, "datasets": datasets})
+    return templates.TemplateResponse(request, "eval_datasets.html", {"datasets": datasets})
 
 
 @app.get("/eval/datasets/{dataset_id}")
@@ -65,15 +64,15 @@ def eval_dataset_detail_page(request: Request, dataset_id: int):
         dataset = session.get(EvalDataset, dataset_id)
         cases = list(session.exec(select(TestCase).where(TestCase.dataset_id == dataset_id)).all())
     if not dataset:
-        return templates.TemplateResponse("404.html", context={"request": request}, status_code=404)
-    return templates.TemplateResponse("eval_detail.html", context={"request": request, "dataset": dataset, "cases": cases})
+        return templates.TemplateResponse(request, "404.html", {}, status_code=404)
+    return templates.TemplateResponse(request, "eval_detail.html", {"dataset": dataset, "cases": cases})
 
 
 @app.get("/eval/runs")
 def eval_runs_page(request: Request):
     with Session(get_engine()) as session:
         runs = list(session.exec(select(EvalRun).order_by(EvalRun.created_at.desc())).all())
-    return templates.TemplateResponse("eval_runs.html", context={"request": request, "runs": runs})
+    return templates.TemplateResponse(request, "eval_runs.html", {"runs": runs})
 
 
 @app.get("/eval/runs/{run_id}")
@@ -86,9 +85,9 @@ def eval_run_detail_page(request: Request, run_id: int):
         else:
             cases = {}
     if not run:
-        return templates.TemplateResponse("404.html", context={"request": request}, status_code=404)
-    return templates.TemplateResponse("eval_run_detail.html", context={
-        "request": request, "run": run, "results": results, "cases": cases,
+        return templates.TemplateResponse(request, "404.html", {}, status_code=404)
+    return templates.TemplateResponse(request, "eval_run_detail.html", {
+        "run": run, "results": results, "cases": cases,
     })
 
 
@@ -96,7 +95,7 @@ def eval_run_detail_page(request: Request, run_id: int):
 def traces_page(request: Request):
     with Session(get_engine()) as session:
         traces = list(session.exec(select(Trace).order_by(Trace.created_at.desc())).all())
-    return templates.TemplateResponse("traces.html", context={"request": request, "traces": traces})
+    return templates.TemplateResponse(request, "traces.html", {"traces": traces})
 
 
 @app.get("/traces/{trace_id}")
@@ -105,9 +104,9 @@ def trace_detail_page(request: Request, trace_id: str):
         trace = session.exec(select(Trace).where(Trace.trace_id == trace_id)).first()
         spans = list(session.exec(select(Span).where(Span.trace_id == trace_id).order_by(Span.created_at)).all()) if trace else []
     if not trace:
-        return templates.TemplateResponse("404.html", context={"request": request}, status_code=404)
-    return templates.TemplateResponse("trace_detail.html", context={
-        "request": request, "trace": trace, "spans": spans,
+        return templates.TemplateResponse(request, "404.html", {}, status_code=404)
+    return templates.TemplateResponse(request, "trace_detail.html", {
+        "trace": trace, "spans": spans,
     })
 
 

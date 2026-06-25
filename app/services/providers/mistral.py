@@ -1,12 +1,12 @@
 import time
-from mistralai.async_client import MistralAsyncClient
+from mistralai.client import Mistral
 from app.services.providers.base import BaseProvider, LLMResponse, ProviderConfig
 
 
 class MistralProvider(BaseProvider):
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
-        self.client = MistralAsyncClient(api_key=config.api_key)
+        self.client = Mistral(api_key=config.api_key)
 
     async def complete(
         self,
@@ -23,7 +23,12 @@ class MistralProvider(BaseProvider):
         messages.append({"role": "user", "content": prompt})
 
         start = time.perf_counter()
-        response = await self.client.chat(model=model, messages=messages, temperature=temperature, max_tokens=max_tokens)
+        response = await self.client.chat.complete_async(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
         latency_ms = (time.perf_counter() - start) * 1000
 
         choice = response.choices[0]
