@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Eval Runs — AI Reliability Platform{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2>Evaluation Runs</h2>
+    <p>History of all evaluation executions</p>
+</div>
+
+<div id="recommendations" style="display: none; margin-bottom: 30px;">
+    <h3 style="margin-bottom: 12px; font-size: 16px;">Recommended Models</h3>
+    <div class="grid" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="card" id="rec-overall">
+            <div class="label">Best Overall</div>
+            <div class="value green" id="rec-overall-model" style="font-size: 16px;"></div>
+            <div style="font-size: 12px; color: #8b949e; margin-top: 4px;" id="rec-overall-reason"></div>
+        </div>
+        <div class="card" id="rec-accuracy">
+            <div class="label">Best Accuracy</div>
+            <div class="value green" id="rec-accuracy-model" style="font-size: 16px;"></div>
+            <div style="font-size: 12px; color: #8b949e; margin-top: 4px;" id="rec-accuracy-reason"></div>
+        </div>
+        <div class="card" id="rec-fastest">
+            <div class="label">Fastest</div>
+            <div class="value green" id="rec-fastest-model" style="font-size: 16px;"></div>
+            <div style="font-size: 12px; color: #8b949e; margin-top: 4px;" id="rec-fastest-reason"></div>
+        </div>
+        <div class="card" id="rec-cheapest">
+            <div class="label">Cheapest</div>
+            <div class="value green" id="rec-cheapest-model" style="font-size: 16px;"></div>
+            <div style="font-size: 12px; color: #8b949e; margin-top: 4px;" id="rec-cheapest-reason"></div>
+        </div>
+    </div>
+</div>
+
+{% if runs %}
+<table>
+    <thead>
+        <tr><th>Run</th><th>Provider</th><th>Model</th><th>Status</th><th>Pass Rate</th><th>Avg Latency</th><th>Cost</th><th>Created</th></tr>
+    </thead>
+    <tbody>
+    {% for r in runs %}
+        <tr>
+            <td><a href="/eval/runs/{{ r.id }}">#{{ r.id }}</a></td>
+            <td>{{ r.provider }}</td>
+            <td>{{ r.model }}</td>
+            <td><span class="badge {{ r.status }}">{{ r.status }}</span></td>
+            <td>{{ "%.1f"|format(r.passed_cases / r.total_cases * 100) if r.total_cases > 0 else "N/A" }}%</td>
+            <td>{{ "%.0f"|format(r.avg_latency_ms) }}ms</td>
+            <td>${{ "%.4f"|format(r.estimated_cost) }}</td>
+            <td>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty">No eval runs yet. Start one via the API:
+    <pre style="margin-top: 12px; background: #21262d; padding: 12px; border-radius: 6px; display: inline-block; text-align: left; color: #c9d1d9;">curl -X POST http://localhost:8000/api/v1/eval/runs \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_id": 1, "provider": "groq", "model": "llama-3.3-70b-versatile"}'</pre>
+</div>
+{% endif %}
+
+<script>
+async function loadRecommendations() {
+    const resp = await fetch('/api/v1/dashboard/recommendations');
+    const data = await resp.json();
+    if (!data.best_overall) return;
+
+    document.getElementById('recommendations').style.display = 'block';
+
+    const set = (id, model, reason) => {
+        document.getElementById(id + '-model').textContent = model;
+        document.getElementById(id + '-reason').textContent = reason;
+    };
+    set('rec-overall', data.best_overall.key, data.best_overall.reason);
+    set('rec-accuracy', data.best_accuracy.key, data.best_accuracy.reason);
+    set('rec-fastest', data.fastest.key, data.fastest.reason);
+    set('rec-cheapest', data.cheapest.key, data.cheapest.reason);
+}
+loadRecommendations();
+</script>
+{% endblock %}

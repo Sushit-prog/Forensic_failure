@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pytest_llm.judge import JudgeResult, LLMJudge
+from pytest_llm.judge import JudgeResult, LLMJudge, _cache_instance
 
 
 class TestJudgeResult:
@@ -90,6 +90,7 @@ class TestLLMJudge:
         assert result.score == 0.0
 
     def test_judge_returns_result_on_success(self):
+        _cache_instance._cache.clear()
         judge = LLMJudge()
         mock_response = json.dumps(
             {"passed": True, "score": 0.88, "reason": "Content is faithful"}
@@ -100,6 +101,7 @@ class TestLLMJudge:
             assert result.score == 0.88
 
     def test_judge_retries_on_failure(self):
+        _cache_instance._cache.clear()
         judge = LLMJudge()
         call_count = 0
 
@@ -116,6 +118,7 @@ class TestLLMJudge:
             assert call_count == 3
 
     def test_judge_returns_failure_after_max_retries(self):
+        _cache_instance._cache.clear()
         judge = LLMJudge()
 
         def mock_call(prompt):
@@ -140,3 +143,19 @@ class TestLLMJudgeEmbed:
         vec1 = judge.embed("test sentence")
         vec2 = judge.embed("test sentence")
         assert vec1 == vec2
+
+
+class TestJudgeCache:
+    def test_judge_cache_hit_avoids_api_call(self):
+        _cache_instance._cache.clear()
+        judge = LLMJudge(provider="openai", model="gpt-4o-mini")
+        mock_response = json.dumps(
+            {"passed": True, "score": 0.9, "reason": "Cached result"}
+        )
+        with patch.object(judge, "_call_llm", return_value=mock_response) as mock_call:
+            result1 = judge.judge("system", "user")
+            result2 = judge.judge("system", "user")
+            assert mock_call.call_count == 1
+            assert result1.passed is True
+            assert result2.passed is True
+            assert result1.score == result2.score

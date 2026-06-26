@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from typing import Any, Optional
@@ -20,6 +21,24 @@ class JudgeResult(BaseModel):
 
 
 _embed_model = None
+
+
+class JudgeCache:
+    def __init__(self):
+        self._cache: dict[str, JudgeResult] = {}
+
+    def _key(self, provider: str, model: str, system_prompt: str, user_prompt: str) -> str:
+        content = f"{provider}:{model}:{system_prompt}:{user_prompt}"
+        return hashlib.sha256(content.encode()).hexdigest()
+
+    def get(self, provider: str, model: str, system_prompt: str, user_prompt: str) -> JudgeResult | None:
+        return self._cache.get(self._key(provider, model, system_prompt, user_prompt))
+
+    def set(self, provider: str, model: str, system_prompt: str, user_prompt: str, result: JudgeResult) -> None:
+        self._cache[self._key(provider, model, system_prompt, user_prompt)] = result
+
+
+_cache_instance = JudgeCache()
 
 
 class LLMJudge:
@@ -99,6 +118,10 @@ class LLMJudge:
             reason: str (one sentence explanation)
             raw_response: str
         """
+        cached = _cache_instance.get(self.provider, self.model, system_prompt, user_prompt)
+        if cached:
+            return cached
+
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
         last_error: Optional[Exception] = None
 
@@ -106,6 +129,7 @@ class LLMJudge:
             try:
                 raw = self._call_llm(full_prompt)
                 result = self._parse_response(raw)
+                _cache_instance.set(self.provider, self.model, system_prompt, user_prompt, result)
                 return result
             except Exception as e:
                 last_error = e

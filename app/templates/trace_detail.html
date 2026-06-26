@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Trace {{ trace.trace_id[:8] }} — AI Reliability Platform{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2>Trace {{ trace.trace_id[:8] }}...</h2>
+    <p>{{ trace.name or "Unnamed" }} · <span class="badge {{ trace.status }}">{{ trace.status }}</span></p>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <div class="label">Total Latency</div>
+        <div class="value">{{ "%.0f"|format(trace.total_latency_ms) }}ms</div>
+    </div>
+    <div class="card">
+        <div class="label">Total Tokens</div>
+        <div class="value">{{ trace.total_tokens }}</div>
+    </div>
+    <div class="card">
+        <div class="label">Spans</div>
+        <div class="value">{{ spans|length }}</div>
+    </div>
+    <div class="card">
+        <div class="label">Created</div>
+        <div class="value" style="font-size: 16px;">{{ trace.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</div>
+    </div>
+</div>
+
+<h3 style="margin-bottom: 16px; font-size: 16px;">Timeline</h3>
+<div class="trace-timeline">
+    {% for s in spans %}
+    {% set latency_pct = (s.latency_ms / trace.total_latency_ms * 100) if trace.total_latency_ms > 0 and s.latency_ms else 0 %}
+    {% set bar_color = '#f85149' if s.status == 'error' else ('#d29922' if s.latency_ms and s.latency_ms > 1000 else '#3fb950') %}
+    <div class="span-item {{ 'error' if s.status == 'error' else '' }}" onclick="this.querySelector('.span-details').classList.toggle('hidden')">
+        <div class="span-header">
+            <span class="span-name">{{ s.name }}</span>
+            <span class="span-meta">
+                {% if s.provider %}{{ s.provider }}/{{ s.model }} · {% endif %}
+                {{ "%.0f"|format(s.latency_ms) if s.latency_ms else "?" }}ms ·
+                {{ (s.tokens_in or 0) + (s.tokens_out or 0) }} tokens
+            </span>
+        </div>
+        <div style="margin: 6px 0; height: 4px; background: #30363d; border-radius: 2px; overflow: hidden;">
+            <div style="height: 100%; width: {{ latency_pct }}%; background: {{ bar_color }}; border-radius: 2px;"></div>
+        </div>
+        <div class="span-meta">
+            <span class="badge {{ s.status }}">{{ s.status }}</span>
+            {% if s.tokens_in %}<span style="margin-left: 8px; color: #8b949e;">in: {{ s.tokens_in }}</span>{% endif %}
+            {% if s.tokens_out %}<span style="margin-left: 8px; color: #8b949e;">out: {{ s.tokens_out }}</span>{% endif %}
+            {% if s.error_message %}
+                <span style="color: #f85149; margin-left: 8px;">{{ s.error_message[:100] }}</span>
+            {% endif %}
+        </div>
+        <div class="span-details hidden" style="margin-top: 8px;">
+            {% if s.input_text %}
+            <div style="margin-bottom: 8px;">
+                <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px;">INPUT</div>
+                <div style="padding: 8px; background: #21262d; border-radius: 4px; font-size: 12px; color: #c9d1d9; max-height: 150px; overflow-y: auto; white-space: pre-wrap;">{{ s.input_text }}</div>
+            </div>
+            {% endif %}
+            {% if s.output_text %}
+            <div>
+                <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px;">OUTPUT</div>
+                <div style="padding: 8px; background: #21262d; border-radius: 4px; font-size: 12px; color: #c9d1d9; max-height: 150px; overflow-y: auto; white-space: pre-wrap;">{{ s.output_text }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<style>
+.hidden { display: none; }
+.span-item { cursor: pointer; }
+.span-item:hover { border-color: #58a6ff; }
+</style>
+{% endblock %}
