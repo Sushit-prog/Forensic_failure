@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Optional
 
@@ -10,6 +11,8 @@ import pytest
 from .config import get_configured_judge
 from .judge import LLMJudge
 from .reporter import LLMReporter
+
+logger = logging.getLogger("pytest_llm")
 
 _reporter: Optional[LLMReporter] = None
 

@@ -4,41 +4,20 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
+import time
 from typing import Any, Optional
 
 import numpy as np
-from pydantic import BaseModel
 
+from .cache import get_cache, make_cache_key
+from .models import JudgeResult
 
-class JudgeResult(BaseModel):
-    """Result from an LLM judge evaluation."""
-
-    passed: bool
-    score: float
-    reason: str
-    raw_response: str = ""
+logger = logging.getLogger("pytest_llm")
 
 
 _embed_model = None
-
-
-class JudgeCache:
-    def __init__(self):
-        self._cache: dict[str, JudgeResult] = {}
-
-    def _key(self, provider: str, model: str, system_prompt: str, user_prompt: str) -> str:
-        content = f"{provider}:{model}:{system_prompt}:{user_prompt}"
-        return hashlib.sha256(content.encode()).hexdigest()
-
-    def get(self, provider: str, model: str, system_prompt: str, user_prompt: str) -> JudgeResult | None:
-        return self._cache.get(self._key(provider, model, system_prompt, user_prompt))
-
-    def set(self, provider: str, model: str, system_prompt: str, user_prompt: str, result: JudgeResult) -> None:
-        self._cache[self._key(provider, model, system_prompt, user_prompt)] = result
-
-
-_cache_instance = JudgeCache()
 
 
 class LLMJudge:
@@ -118,24 +97,28 @@ class LLMJudge:
             reason: str (one sentence explanation)
             raw_response: str
         """
-        cached = _cache_instance.get(self.provider, self.model, system_prompt, user_prompt)
+        cache = get_cache()
+        cache_key = make_cache_key(self.provider, self.model, system_prompt, user_prompt)
+        cached = cache.get(cache_key)
         if cached:
+            logger.debug("Cache hit for provider=%s model=%s", self.provider, self.model)
             return cached
 
-        full_prompt = f"{system_prompt}\n\n{user_prompt}"
         last_error: Optional[Exception] = None
 
         for attempt in range(3):
             try:
-                raw = self._call_llm(full_prompt)
+                raw = self._call_llm(system_prompt, user_prompt)
                 result = self._parse_response(raw)
-                _cache_instance.set(self.provider, self.model, system_prompt, user_prompt, result)
+                cache.set(cache_key, result)
                 return result
             except Exception as e:
                 last_error = e
+                logger.warning("Attempt %d failed: %s", attempt + 1, e)
                 if attempt < 2:
-                    continue
+                    time.sleep(2 ** attempt)
 
+        logger.error("Judge failed after 3 attempts: %s", last_error)
         return JudgeResult(
             passed=False,
             score=0.0,
@@ -143,13 +126,17 @@ class LLMJudge:
             raw_response="",
         )
 
-    def _call_llm(self, prompt: str) -> str:
+    def _call_llm(self, system_prompt: str, user_prompt: str) -> str:
         client = self._get_client()
 
         if self.provider == "openai":
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": user_prompt})
             response = client.chat.completions.create(
                 model=self.model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 temperature=0,
             )
             return response.choices[0].message.content or ""
@@ -158,22 +145,31 @@ class LLMJudge:
             response = client.messages.create(
                 model=self.model,
                 max_tokens=1024,
-                messages=[{"role": "user", "content": prompt}],
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
             )
             return response.content[0].text
 
         elif self.provider == "groq":
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": user_prompt})
             response = client.chat.completions.create(
                 model=self.model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 temperature=0,
             )
             return response.choices[0].message.content or ""
 
         elif self.provider == "ollama":
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": user_prompt})
             response = client.chat(
                 model=self.model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
             )
             return response["message"]["content"]
 

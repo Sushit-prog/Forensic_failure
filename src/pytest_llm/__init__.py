@@ -11,7 +11,8 @@ from .assertions import (
     assert_tone,
 )
 from .config import pytest_configure_judge
-from .judge import JudgeResult, LLMJudge
+from .judge import LLMJudge
+from .models import JudgeResult
 from .reporter import LLMReporter
 
 __all__ = [

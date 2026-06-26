@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from .judge import LLMJudge
+
+logger = logging.getLogger("pytest_llm")
 
 _config: dict = {}
 

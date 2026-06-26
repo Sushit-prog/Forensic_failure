@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from pytest_llm.judge import JudgeResult, LLMJudge
+from pytest_llm.judge import LLMJudge
+from pytest_llm.models import JudgeResult
 
 
 class MockJudge(LLMJudge):
